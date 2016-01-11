@@ -61,6 +61,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
@@ -82,57 +83,60 @@ import android.widget.Toast;
  */
 
 public abstract class ARActivity extends Activity implements CameraEventListener {
+	private final float TOUCH_SCALE_FACTOR = 180.0f / 320;
+	private float mPreviousX;
+	private float mPreviousY;
 
 	/**
 	 * Android logging tag for this class.
 	 */
 	protected final static String TAG = "ARActivity";
-	
+
 	/**
 	 * Camera preview which will provide video frames.
 	 */
 	private CaptureCameraPreview preview;
-	
+
 	/**
-	 * GL surface to render the virtual objects	 
+	 * GL surface to render the virtual objects
 	 */
-	private GLSurfaceView glView;	
-	
+	private GLSurfaceView glView;
+
 	/**
 	 *  Renderer to use. This is provided by the subclass using {@link supplyRenderer()}.
 	 */
-	protected ARRenderer renderer;	
-	
+	protected ARRenderer renderer;
+
 	/**
 	 * Layout that will be filled with the camera preview and GL views. This is provided by the subclass using {@link supplyFrameLayout()}.
 	 */
-	protected FrameLayout mainLayout; 
-	
+	protected FrameLayout mainLayout;
+
 	/**
      * For any square template (pattern) markers, the number of rows
      * and columns in the template. May not be less than 16 or more than AR_PATT_SIZE1_MAX.
      */
 	protected int pattSize = 16;
-	
+
 	/**
      * For any square template (pattern) markers, the maximum number
      * of markers that may be loaded for a single matching pass. Must be > 0.
      */
 	protected int pattCountMax = 25;
-	
+
 	private boolean firstUpdate = false;
-	
+
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH) @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-       
+
         // This needs to be done just only the very first time the application is run,
         // or whenever a new preference is added (e.g. after an application upgrade).
         PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
-        
+
         // Correctly configures the activity window for running AR in a layer
-        // on top of the camera preview. This includes entering 
-        // fullscreen landscape mode and enabling transparency. 
+        // on top of the camera preview. This includes entering
+        // fullscreen landscape mode and enabling transparency.
 		boolean needActionBar = false;
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
@@ -144,7 +148,7 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 		if (needActionBar) {
 			requestWindowFeature(Window.FEATURE_ACTION_BAR);
 		} else {
-            requestWindowFeature(Window.FEATURE_NO_TITLE);        	
+            requestWindowFeature(Window.FEATURE_NO_TITLE);
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         }
         getWindow().setFormat(PixelFormat.TRANSLUCENT);
@@ -153,78 +157,78 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 
         AndroidUtils.reportDisplayInformation(this);
     }
-	
+
     /**
      * Allows subclasses to supply a custom {@link Renderer}.
      * @return The {@link Renderer} to use.
      */
     protected abstract ARRenderer supplyRenderer();
-    
+
     /**
      * Allows subclasses to supply a {@link FrameLayout} which will be populated
      * with a camera preview and GL surface view.
      * @return The {@link FrameLayout} to use.
      */
     protected abstract FrameLayout supplyFrameLayout();
-        
+
 	@Override
     protected void onStart() {
 
-    	super.onStart();    
+    	super.onStart();
 
     	Log.i(TAG, "Activity starting.");
-    	
+
     	if (ARToolKit.getInstance().initialiseNativeWithOptions(this.getCacheDir().getAbsolutePath(), pattSize, pattCountMax) == false) { // Use cache directory for Data files.
-        	
+
     		 new AlertDialog.Builder(this)
     	      .setMessage("The native library is not loaded. The application cannot continue.")
     	      .setTitle("Error")
     	      .setCancelable(true)
     	      .setNeutralButton(android.R.string.cancel,
     	         new DialogInterface.OnClickListener() {
-    	         public void onClick(DialogInterface dialog, int whichButton){ finish(); }    	         
+    	         public void onClick(DialogInterface dialog, int whichButton){ finish(); }
     	         })
     	      .show();
 
     		return;
         }
-    	
+
     	mainLayout = supplyFrameLayout();
     	if (mainLayout == null) {
     		Log.e(TAG, "Error: supplyFrameLayout did not return a layout.");
     		return;
     	}
- 
+
     	renderer = supplyRenderer();
     	if (renderer == null) {
     		Log.e(TAG, "Error: supplyRenderer did not return a renderer.");
     		// No renderer supplied, use default, which does nothing
     		renderer = new ARRenderer();
     	}
-    			       
+
     }
-    
+
     @SuppressWarnings("deprecation") // FILL_PARENT still required for API level 7 (Android 2.1)
 	@Override
     public void onResume() {
     	//Log.i(TAG, "onResume()");
     	super.onResume();
-    	
+
     	// Create the camera preview
     	preview = new CaptureCameraPreview(this, this);
-    	
-    	Log.i(TAG, "CaptureCameraPreview created"); 
-    	
+
+    	Log.i(TAG, "CaptureCameraPreview created");
+
     	// Create the GL view
-    	glView = new GLSurfaceView(this);    		
+    	glView = new GLSurfaceView(this);
 		glView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
 		glView.getHolder().setFormat(PixelFormat.TRANSLUCENT); // Needs to be a translucent surface so the camera preview shows through.
-		glView.setRenderer(renderer);		
+		glView.setRenderer(renderer);
 		glView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY); // Only render when we have a frame (must call requestRender()).
 		glView.setZOrderMediaOverlay(true); // Request that GL view's SurfaceView be on top of other SurfaceViews (including CameraPreview's SurfaceView).
-		
+
 		Log.i(TAG, "GLSurfaceView created");
-		
+
 		// Add the views to the interface
         mainLayout.addView(preview, new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
         mainLayout.addView(glView, new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
@@ -233,14 +237,14 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 
 		if (glView != null) glView.onResume();
     }
-    
+
 	@Override
 	protected void onPause() {
     	//Log.i(TAG, "onPause()");
 	    super.onPause();
-	    
+
 	    if (glView != null) glView.onPause();
-	    
+
 	    // System hardware must be released in onPause(), so it's available to
 	    // any incoming activity. Removing the CameraPreview will do this for the
 	    // camera. Also do it for the GLSurfaceView, since it serves no purpose
@@ -248,21 +252,21 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 	    mainLayout.removeView(glView);
 	    mainLayout.removeView(preview);
 	}
-	
-	@Override 
+
+	@Override
 	public void onStop() {
     	Log.i(TAG, "Activity stopping.");
-		
+
 		super.onStop();
 	}
-    
+
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 	    MenuInflater inflater = getMenuInflater();
 	    inflater.inflate(R.menu.options, menu);
 	    return true;
 	}
-	
+
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 	    if (item.getItemId() == R.id.settings) {
@@ -272,7 +276,7 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 			return super.onOptionsItemSelected(item);
 		}
 	}
-	
+
 	/**
 	 * Returns the camera preview that is providing the video frames.
 	 * @return The camera preview that is providing the video frames.
@@ -280,7 +284,7 @@ public abstract class ARActivity extends Activity implements CameraEventListener
     public CaptureCameraPreview getCameraPreview() {
     	return preview;
     }
-    
+
     /**
      * Returns the GL surface view.
      * @return The GL surface view.
@@ -288,10 +292,10 @@ public abstract class ARActivity extends Activity implements CameraEventListener
     public GLSurfaceView getGLView() {
     	return glView;
     }
-    
+
     @Override
 	public void cameraPreviewStarted(int width, int height, int rate, int cameraIndex, boolean cameraIsFrontFacing) {
-	
+
 		if (ARToolKit.getInstance().initialiseAR(width, height, "Data/camera_para.dat", cameraIndex, cameraIsFrontFacing)) { // Expects Data to be already in the cache dir. This can be done with the AssetUnpacker.
 			Log.i(TAG, "Camera initialised");
 		} else {
@@ -299,12 +303,12 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 			Log.e(TAG, "Error initialising camera. Cannot continue.");
 			finish();
 		}
-		
+
 		Toast.makeText(this, "Camera settings: " + width + "x" + height + "@" + rate + "fps", Toast.LENGTH_SHORT).show();
-		
+
 		firstUpdate = true;
 	}
-    
+
     //
     // At present, the underlying ARWrapper is not thread-safe,
     // so this multi-threaded version is set aside in favour of a single-threaded version
@@ -373,58 +377,77 @@ public abstract class ARActivity extends Activity implements CameraEventListener
 		}
 	}	
 	*/
-    
+
 	@Override
 	public void cameraPreviewFrame(byte[] frame) {
-	
+
 		if (firstUpdate) {
 			// ARToolKit has been initialised. The renderer can now add markers, etc...
 			if (renderer.configureARScene()) {
 				Log.i(TAG, "Scene configured successfully");
-			} else { 
+			} else {
 				// Error
 				Log.e(TAG, "Error configuring scene. Cannot continue.");
 				finish();
 			}
 			firstUpdate = false;
 		}
-		
+
 		if (ARToolKit.getInstance().convertAndDetect(frame)) {
-			
+
 			// Update the renderer as the frame has changed
 			if (glView != null) glView.requestRender();
-			
+
 			onFrameProcessed();
 		}
-		
-	} 
-	
+
+	}
+
     public void onFrameProcessed() {
     }
-    
+
 	@Override
 	public void cameraPreviewStopped() {
 		ARToolKit.getInstance().cleanup();
-	}	
+	}
 
 	protected void showInfo() {
-    	
+
 		AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(this);
-		
+
 		dialogBuilder.setMessage("ARToolKit Version: " + NativeInterface.arwGetARToolKitVersion());
-		
+
 		dialogBuilder.setCancelable(false);
 		dialogBuilder.setPositiveButton("Close", new DialogInterface.OnClickListener() {
 			public void onClick(DialogInterface dialog, int id) {
 				dialog.cancel();
 			}
 		});
-		
+
 		AlertDialog alert = dialogBuilder.create();
 		alert.setTitle("ARToolKit");
 		alert.show();
-    	
-		
+
+
     }
-    
+
+	@Override
+	public boolean onTouchEvent(MotionEvent e) {
+		float x = e.getX();
+		float y = e.getY();
+
+		switch (e.getAction()) {
+			case MotionEvent.ACTION_MOVE:
+
+				float dx = x - mPreviousX;
+				float dy = y - mPreviousY;
+
+				// reverse direction of rotation above the mid-line
+
+		}
+		Toast.makeText(getApplicationContext(),"helloo",Toast.LENGTH_SHORT).show();
+
+		return true;
+	}
+
 }

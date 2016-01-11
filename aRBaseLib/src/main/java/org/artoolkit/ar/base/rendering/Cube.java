@@ -123,6 +123,5 @@ public class Cube {
     	GLES10.glDisableClientState(GLES10.GL_VERTEX_ARRAY);
         
     }
-    
 
 }

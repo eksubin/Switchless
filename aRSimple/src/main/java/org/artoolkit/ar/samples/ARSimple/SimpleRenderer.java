@@ -101,4 +101,5 @@ public class SimpleRenderer extends ARRenderer {
 		}
 
 	}
+
 }
