@@ -55,6 +55,7 @@ import org.artoolkit.ar.base.ARToolKit;
 import org.artoolkit.ar.base.rendering.ARRenderer;
 import org.artoolkit.ar.base.rendering.Cube;
 
+//hello
 /**
  * A very simple Renderer that adds a marker and draws a cube on it.
  */
