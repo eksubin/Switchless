@@ -48,10 +48,13 @@ import android.opengl.GLES10;
  * Simple class to render a coloured cube.
  */
 public class Cube {
-    
+
+
+//	public static float x_ret;
 	private FloatBuffer	mVertexBuffer;
     private FloatBuffer	mColorBuffer;
     private ByteBuffer	mIndexBuffer;
+	public static float x_ret,y_ret;
     
     public Cube() {
     	this(1.0f);
@@ -67,6 +70,8 @@ public class Cube {
 	
 	private void setArrays(float size, float x, float y, float z) {
 
+		x_ret = x;
+		y_ret = y;
 		float hs = size / 2.0f;
 
 		float vertices[] = { 
@@ -107,6 +112,7 @@ public class Cube {
 	mIndexBuffer = RenderUtils.buildByteBuffer(indices);
 	
     }
+
     
     public void draw(GL10 unused) {
     	

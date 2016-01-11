@@ -105,6 +105,8 @@ public class ARToolKit {
 		Log.i(TAG, "ARToolKit constructor");
 	}
 
+
+
 	/**
 	 * Initialises the native code library if it is available.
 	 * @return true if the library was found and successfully initialised.
@@ -278,6 +280,7 @@ public class ARToolKit {
 		if (!initedNative) return null;
 		return NativeInterface.arwGetProjectionMatrix();
 	}
+
 
 	/**
 	 * Adds a new single marker to the set of currently active markers.
